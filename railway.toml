@@ -10,8 +10,8 @@
 
 [build]
 builder = "NIXPACKS"
-# Evita `next build`; instala com pnpm (lockfile tem de estar commitado com package.json)
-buildCommand = "pnpm install --frozen-lockfile"
+# Só instala na fase "install"; aqui não repetir pnpm (evita mounts extra do Next na fase build)
+buildCommand = "true"
 
 [deploy]
 startCommand = "pnpm run start:ws"
