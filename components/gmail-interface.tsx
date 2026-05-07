@@ -249,7 +249,7 @@ export function GmailInterface() {
             </button>
           </div>
 
-          <EmailList messages={messages} isConnected={isConnected} />
+          <EmailList />
         </main>
 
         <aside className="flex w-14 flex-col items-center gap-4 border-l border-border bg-sidebar py-4">
