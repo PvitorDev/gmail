@@ -10,9 +10,9 @@
 
 [build]
 builder = "NIXPACKS"
-# Evita `next build` deste package.json — só instala dependências
-buildCommand = "npm ci"
+# Evita `next build`; instala com pnpm (lockfile tem de estar commitado com package.json)
+buildCommand = "pnpm install --frozen-lockfile"
 
 [deploy]
-startCommand = "npm run start:ws"
+startCommand = "pnpm run start:ws"
 restartPolicyType = "ON_FAILURE"
