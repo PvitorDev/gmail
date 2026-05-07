@@ -13,7 +13,7 @@ interface ChatWire {
   subject: string
 }
 
-const PORT = Number(process.env.WS_PORT) || 8080
+const PORT = Number(process.env.PORT ?? process.env.WS_PORT) || 8080
 /** Máximo de mensagens guardadas por sala (memória) */
 const HISTORY_LIMIT = Number(process.env.WS_HISTORY_LIMIT) || 50
 
@@ -129,8 +129,10 @@ wss.on("connection", (socket: Client) => {
 
 wss.on("listening", () => {
   console.log(
-    `WebSocket ouvindo em ws://localhost:${PORT} (histórico até ${HISTORY_LIMIT} msgs/sala)`
+    `WebSocket na porta ${PORT} (histórico até ${HISTORY_LIMIT} msgs/sala)`
   )
+  const pub = process.env.RAILWAY_PUBLIC_DOMAIN
+  if (pub) console.log(`Cliente: use wss://${pub}`)
 })
 
 process.on("SIGINT", () => {
