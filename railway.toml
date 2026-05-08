@@ -2,7 +2,7 @@
 #
 # 1. railway login && railway init (ou liga este repositório a um projeto novo só para o WS)
 # 2. Na Railway: New Service → mesmo repo; em Settings não uses "Root Directory" a menos que ajustes os caminhos
-# 3. Variáveis opcionais: WS_HISTORY_LIMIT
+# 3. Variáveis opcionais: WS_HISTORY_LIMIT | WS_SPY_LOGS=0 para desligar logs de salas/mensagens
 # 4. A Railway define PORT automaticamente — não sobrescrevas
 # 5. No frontend (.env.local), define NEXT_PUBLIC_WS_URL=wss://<teu-dominio>.up.railway.app
 #
