@@ -11,6 +11,7 @@ interface ChatWire {
   timestamp: string
   room: string
   subject: string
+  replyTo?: { id: string; sender: string; content: string }
 }
 
 const PORT = Number(process.env.PORT ?? process.env.WS_PORT) || 8080
@@ -60,6 +61,18 @@ function sendHistory(socket: Client, room: string) {
   )
 }
 
+function parseReplyPayload(
+  raw: unknown
+): { id: string; sender: string; content: string } | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined
+  const o = raw as Record<string, unknown>
+  const id = typeof o.id === "string" ? o.id.slice(0, 120) : ""
+  const sender = typeof o.sender === "string" ? o.sender.slice(0, 200) : ""
+  const content = typeof o.content === "string" ? o.content.slice(0, 500) : ""
+  if (!id || !sender) return undefined
+  return { id, sender, content }
+}
+
 function normalizeChat(
   data: Record<string, unknown>,
   fallbackRoom: string
@@ -74,6 +87,8 @@ function normalizeChat(
   const subject =
     typeof subjectRaw === "string" ? subjectRaw.slice(0, 500) : ""
 
+  const replyTo = parseReplyPayload(data.replyTo)
+
   const msg: ChatWire = {
     id: typeof data.id === "string" ? data.id : randomUUID(),
     content: typeof data.content === "string" ? data.content : "",
@@ -84,6 +99,7 @@ function normalizeChat(
         : new Date().toISOString(),
     room,
     subject,
+    ...(replyTo ? { replyTo } : {}),
   }
   return JSON.stringify(msg)
 }

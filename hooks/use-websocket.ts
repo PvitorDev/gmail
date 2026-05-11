@@ -2,6 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 
+export interface MessageReplyRef {
+  id: string
+  sender: string
+  content: string
+}
+
 export interface Message {
   id: string
   content: string
@@ -9,6 +15,17 @@ export interface Message {
   timestamp: Date
   isOwn: boolean
   subject?: string
+  replyTo?: MessageReplyRef
+}
+
+function mapReplyPayload(raw: unknown): MessageReplyRef | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined
+  const o = raw as Record<string, unknown>
+  const id = typeof o.id === "string" ? o.id.slice(0, 120) : ""
+  const sender = typeof o.sender === "string" ? o.sender.slice(0, 200) : ""
+  const content = typeof o.content === "string" ? o.content.slice(0, 500) : ""
+  if (!id || !sender) return undefined
+  return { id, sender, content }
 }
 
 interface UseWebSocketOptions {
@@ -95,6 +112,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
           if (data.type === "history" && Array.isArray(data.messages)) {
             const mapped: Message[] = data.messages.map((m: Record<string, unknown>) => {
               const sender = String(m.sender ?? "Desconhecido")
+              const replyTo = mapReplyPayload(m.replyTo)
               return {
                 id: String(m.id ?? crypto.randomUUID()),
                 content: String(m.content ?? ""),
@@ -106,6 +124,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
                 ),
                 isOwn: sameSender(sender, localSenderRef.current),
                 subject: typeof m.subject === "string" ? m.subject : undefined,
+                ...(replyTo ? { replyTo } : {}),
               }
             })
             setMessages(mapped)
@@ -115,16 +134,30 @@ export function useWebSocket(options: UseWebSocketOptions) {
           if (data.type === "join") return
 
           const sender = data.sender || "Desconhecido"
+          const id = typeof data.id === "string" ? data.id : crypto.randomUUID()
+          const replyFromWire = mapReplyPayload(data.replyTo)
           const message: Message = {
-            id: data.id || crypto.randomUUID(),
-            content: data.content,
+            id,
+            content: typeof data.content === "string" ? data.content : String(data.content ?? ""),
             sender,
             timestamp: new Date(data.timestamp || Date.now()),
             isOwn: sameSender(sender, localSenderRef.current),
             subject: typeof data.subject === "string" ? data.subject : undefined,
+            ...(replyFromWire ? { replyTo: replyFromWire } : {}),
           }
-          setMessages((prev) => [...prev, message])
-          onMessage?.(message)
+
+          let toNotify: Message = message
+          setMessages((prev) => {
+            const i = prev.findIndex((m) => m.id === id)
+            if (i === -1) return [...prev, message]
+            const merged: Message = {
+              ...message,
+              replyTo: message.replyTo ?? prev[i]!.replyTo,
+            }
+            toNotify = merged
+            return [...prev.slice(0, i), merged, ...prev.slice(i + 1)]
+          })
+          onMessage?.(toNotify)
         } catch {
           const message: Message = {
             id: crypto.randomUUID(),
@@ -151,24 +184,46 @@ export function useWebSocket(options: UseWebSocketOptions) {
       content: string,
       sender: string = "Você",
       subject?: string,
-      roomOverride?: string
+      roomOverride?: string,
+      replyTo?: MessageReplyRef
     ) => {
       if (wsRef.current?.readyState !== WebSocket.OPEN) return false
 
       const room =
         (roomOverride?.trim() || roomRef.current || "default").trim() || "default"
 
-      const message = {
-        id: crypto.randomUUID(),
+      const id = crypto.randomUUID()
+      const message: Record<string, unknown> = {
+        id,
         content,
         sender,
         timestamp: new Date().toISOString(),
         room,
         subject: subject ?? "",
       }
+      const replyPayload = replyTo
+        ? {
+            id: replyTo.id.slice(0, 120),
+            sender: replyTo.sender.slice(0, 200),
+            content: replyTo.content.slice(0, 500),
+          }
+        : undefined
+      if (replyPayload) {
+        message.replyTo = replyPayload
+      }
 
       try {
         wsRef.current.send(JSON.stringify(message))
+        const optimistic: Message = {
+          id,
+          content,
+          sender,
+          timestamp: new Date(),
+          isOwn: sameSender(sender, localSenderRef.current),
+          subject: subject?.trim() ? subject : undefined,
+          ...(replyPayload ? { replyTo: replyPayload } : {}),
+        }
+        setMessages((prev) => (prev.some((m) => m.id === id) ? prev : [...prev, optimistic]))
         return true
       } catch {
         return false

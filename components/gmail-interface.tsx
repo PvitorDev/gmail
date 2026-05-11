@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
-import { useWebSocket } from "@/hooks/use-websocket"
+import { useWebSocket, type MessageReplyRef } from "@/hooks/use-websocket"
 import { ComposeModal } from "./compose-modal"
 import { EmailList } from "./email-list"
 import { NameSetupModal } from "./name-setup-modal"
@@ -93,10 +93,15 @@ export function GmailInterface() {
     setRoom(r)
   }
 
-  const handleSendMessage = (content: string, subject: string, roomForSend: string) => {
+  const handleSendMessage = (
+    content: string,
+    subject: string,
+    roomForSend: string,
+    replyTo?: MessageReplyRef
+  ) => {
     const r = roomForSend.trim() || "geral"
     if (r !== room) setRoom(r)
-    sendMessage(content, userName, subject, r)
+    sendMessage(content, userName, subject, r, replyTo)
   }
 
   return (
