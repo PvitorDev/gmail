@@ -18,12 +18,18 @@ export interface Message {
   replyTo?: MessageReplyRef
 }
 
+function stringifyField(value: unknown, maxLen: number): string {
+  if (typeof value === "string") return value.slice(0, maxLen)
+  if (typeof value === "number" && Number.isFinite(value)) return String(value).slice(0, maxLen)
+  return ""
+}
+
 function mapReplyPayload(raw: unknown): MessageReplyRef | undefined {
   if (typeof raw !== "object" || raw === null) return undefined
   const o = raw as Record<string, unknown>
-  const id = typeof o.id === "string" ? o.id.slice(0, 120) : ""
-  const sender = typeof o.sender === "string" ? o.sender.slice(0, 200) : ""
-  const content = typeof o.content === "string" ? o.content.slice(0, 500) : ""
+  const id = stringifyField(o.id, 120)
+  const sender = stringifyField(o.sender, 200)
+  const content = stringifyField(o.content, 500)
   if (!id || !sender) return undefined
   return { id, sender, content }
 }
@@ -136,6 +142,18 @@ export function useWebSocket(options: UseWebSocketOptions) {
           const sender = data.sender || "Desconhecido"
           const id = typeof data.id === "string" ? data.id : crypto.randomUUID()
           const replyFromWire = mapReplyPayload(data.replyTo)
+          if (
+            process.env.NODE_ENV === "development" &&
+            process.env.NEXT_PUBLIC_WS_DEBUG === "1" &&
+            !data.type &&
+            typeof data.content === "string"
+          ) {
+            console.debug("[ws:frame]", {
+              id,
+              sender,
+              hasReplyTo: Boolean(replyFromWire),
+            })
+          }
           const message: Message = {
             id,
             content: typeof data.content === "string" ? data.content : String(data.content ?? ""),

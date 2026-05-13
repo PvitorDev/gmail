@@ -14,7 +14,7 @@ interface ChatWire {
   replyTo?: { id: string; sender: string; content: string }
 }
 
-const PORT = Number(process.env.PORT ?? process.env.WS_PORT) || 8080
+const PORT = Number(process.env.PORT ?? process.env.WS_PORT) || 8085
 /** Máximo de mensagens guardadas por sala (memória) */
 const HISTORY_LIMIT = Number(process.env.WS_HISTORY_LIMIT) || 50
 
@@ -61,14 +61,20 @@ function sendHistory(socket: Client, room: string) {
   )
 }
 
+function wireString(value: unknown, maxLen: number): string {
+  if (typeof value === "string") return value.slice(0, maxLen)
+  if (typeof value === "number" && Number.isFinite(value)) return String(value).slice(0, maxLen)
+  return ""
+}
+
 function parseReplyPayload(
   raw: unknown
 ): { id: string; sender: string; content: string } | undefined {
   if (typeof raw !== "object" || raw === null) return undefined
   const o = raw as Record<string, unknown>
-  const id = typeof o.id === "string" ? o.id.slice(0, 120) : ""
-  const sender = typeof o.sender === "string" ? o.sender.slice(0, 200) : ""
-  const content = typeof o.content === "string" ? o.content.slice(0, 500) : ""
+  const id = wireString(o.id, 120)
+  const sender = wireString(o.sender, 200)
+  const content = wireString(o.content, 500)
   if (!id || !sender) return undefined
   return { id, sender, content }
 }

@@ -22,18 +22,21 @@ import {
   Plus,
   Video,
   Users,
+  Bell,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { useState, useEffect } from "react"
-import { useWebSocket, type MessageReplyRef } from "@/hooks/use-websocket"
+import { useState, useEffect, useCallback } from "react"
+import { useWebSocket, type Message, type MessageReplyRef } from "@/hooks/use-websocket"
+import { useMessageNotifications } from "@/hooks/use-message-notifications"
 import { ComposeModal } from "./compose-modal"
 import { EmailList } from "./email-list"
 import { NameSetupModal } from "./name-setup-modal"
 import { getWebSocketUrl } from "@/lib/ws-config"
 
 const ROOM_STORAGE_KEY = "fake-gmail-room"
+const NOTIFY_MSG_STORAGE_KEY = "fake-gmail-msg-notify"
 
 const sidebarItems = [
   { icon: Inbox, label: "Caixa de entrada", count: 3, active: true },
@@ -52,6 +55,8 @@ const bottomItems = [
 
 export function GmailInterface() {
   const [isComposeOpen, setIsComposeOpen] = useState(false)
+  const [replyPreset, setReplyPreset] = useState<Message | null>(null)
+  const [msgNotifyOn, setMsgNotifyOn] = useState(false)
   const [userName, setUserName] = useState("")
   const [nameGateOpen, setNameGateOpen] = useState(false)
   const [boot, setBoot] = useState(false)
@@ -64,6 +69,14 @@ export function GmailInterface() {
     localSender: userName,
     room,
   })
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const wants = localStorage.getItem(NOTIFY_MSG_STORAGE_KEY) === "1"
+    const granted =
+      typeof Notification !== "undefined" && Notification.permission === "granted"
+    setMsgNotifyOn(wants && granted)
+  }, [])
 
   useEffect(() => {
     const savedName = localStorage.getItem("fake-gmail-user-name")?.trim()
@@ -103,6 +116,33 @@ export function GmailInterface() {
     if (r !== room) setRoom(r)
     sendMessage(content, userName, subject, r, replyTo)
   }
+
+  const consumeReplyPreset = useCallback(() => {
+    setReplyPreset(null)
+  }, [])
+
+  const onNotifyMessageInteract = useCallback((m: Message) => {
+    setIsComposeOpen(true)
+    setReplyPreset({
+      ...m,
+      timestamp: new Date(m.timestamp),
+      replyTo: m.replyTo ? { ...m.replyTo } : undefined,
+    })
+  }, [])
+
+  useMessageNotifications(msgNotifyOn, messages, onNotifyMessageInteract)
+
+  const handleMessageNotifyOptIn = useCallback(async () => {
+    if (typeof Notification === "undefined") return
+    const perm = await Notification.requestPermission()
+    if (perm === "granted") {
+      localStorage.setItem(NOTIFY_MSG_STORAGE_KEY, "1")
+      setMsgNotifyOn(true)
+    } else {
+      localStorage.setItem(NOTIFY_MSG_STORAGE_KEY, "0")
+      setMsgNotifyOn(false)
+    }
+  }, [])
 
   return (
     <div className="flex h-screen flex-col bg-background">
@@ -194,7 +234,7 @@ export function GmailInterface() {
             ))}
           </nav>
 
-          <div className="border-t border-sidebar-border px-4 pt-4">
+          <div className="relative border-t border-sidebar-border px-4 pt-4 group/sync">
             <div
               className={cn(
                 "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs",
@@ -205,17 +245,33 @@ export function GmailInterface() {
             >
               <div
                 className={cn(
-                  "h-2 w-2 rounded-full",
+                  "h-2 w-2 shrink-0 rounded-full",
                   isConnected ? "bg-green-500" : "bg-muted-foreground"
                 )}
               />
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5 pr-6">
                 <span>{isConnected ? "Sincronizado" : "A ligar…"}</span>
                 <span className="truncate text-[10px] opacity-80" title={wsUrl}>
                   Sala: {room} · {wsUrl}
                 </span>
               </span>
             </div>
+            <button
+              type="button"
+              aria-label="Ativar notificações de novas mensagens (sem som)"
+              title="Notificações ao receber mensagens de outros (clicar para pedir permissão; sem som)"
+              onClick={handleMessageNotifyOptIn}
+              className={cn(
+                "absolute right-5 top-1/2 z-10 -translate-y-1/2 rounded p-1 text-current opacity-0 transition-opacity",
+                "hover:bg-black/10 dark:hover:bg-white/10",
+                "focus-visible:opacity-100 group-hover/sync:opacity-100"
+              )}
+            >
+              <Bell
+                className={cn("h-3.5 w-3.5", msgNotifyOn ? "opacity-100" : "opacity-70")}
+                aria-hidden
+              />
+            </button>
           </div>
         </aside>
 
@@ -285,6 +341,8 @@ export function GmailInterface() {
         onRoomCommit={handleRoomCommit}
         messages={messages}
         isConnected={isConnected}
+        replyToMessagePreset={replyPreset}
+        onReplyPresetConsumed={consumeReplyPreset}
       />
     </div>
   )

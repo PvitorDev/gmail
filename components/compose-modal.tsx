@@ -49,6 +49,9 @@ interface ComposeModalProps {
   onRoomCommit: (room: string) => void
   messages: Message[]
   isConnected: boolean
+  /** Define resposta em cadeia (ex. clique numa notificação). */
+  replyToMessagePreset?: Message | null
+  onReplyPresetConsumed?: () => void
 }
 
 export function ComposeModal({
@@ -59,6 +62,8 @@ export function ComposeModal({
   onRoomCommit,
   messages,
   isConnected,
+  replyToMessagePreset = null,
+  onReplyPresetConsumed,
 }: ComposeModalProps) {
   const [messageInput, setMessageInput] = useState("")
   const [toField, setToField] = useState(room)
@@ -138,6 +143,13 @@ export function ComposeModal({
     setReplyingTo(message)
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
+
+  useEffect(() => {
+    if (!isOpen || !replyToMessagePreset) return
+    setReplyingTo(replyToMessagePreset)
+    requestAnimationFrame(() => textareaRef.current?.focus())
+    onReplyPresetConsumed?.()
+  }, [isOpen, replyToMessagePreset, onReplyPresetConsumed])
 
   if (!isOpen) return null
 

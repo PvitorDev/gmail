@@ -6,6 +6,8 @@
 # 4. A Railway define PORT automaticamente — não sobrescrevas
 # 5. No frontend (.env.local), define NEXT_PUBLIC_WS_URL=wss://<teu-dominio>.up.railway.app
 #
+# 6. Após alterar server/websocket-server.ts (ex. replyTo), faz redeploy deste serviço WS para todos os clientes receberem o mesmo protocolo.
+#
 # Se no mesmo repositório também fizeres deploy do Next.js, cria outro serviço na Railway com outro start/build (ex.: npm run build && npm start).
 
 [build]
