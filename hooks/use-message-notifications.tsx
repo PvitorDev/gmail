@@ -19,11 +19,14 @@ function showDesktopNotification(msg: Message, onInteract: (m: Message) => void)
   const snap = snapshotMessage(msg)
   const body =
     msg.content.length > 200 ? `${msg.content.slice(0, 200)}…` : msg.content || "(sem texto)"
+  const icon =
+    typeof window !== "undefined" ? `${window.location.origin}/icon.svg` : undefined
   try {
     const n = new Notification(msg.sender, {
       body,
       silent: true,
       tag: msg.id,
+      icon,
     })
     n.onclick = () => {
       n.close()
@@ -50,28 +53,6 @@ function showDesktopNotification(msg: Message, onInteract: (m: Message) => void)
   }
 }
 
-function showInAppToast(msg: Message, onInteract: (m: Message) => void) {
-  const snap = snapshotMessage(msg)
-  const body =
-    msg.content.length > 200 ? `${msg.content.slice(0, 200)}…` : msg.content || "(sem texto)"
-  toast.custom(
-    (id) => (
-      <button
-        type="button"
-        className="w-[min(100vw-2rem,22rem)] rounded-lg border border-border bg-popover p-3 text-left text-popover-foreground shadow-md"
-        onClick={() => {
-          toast.dismiss(id)
-          onInteract(snap)
-        }}
-      >
-        <div className="font-medium text-foreground">{msg.sender}</div>
-        <div className="mt-1 text-sm text-muted-foreground">{body}</div>
-      </button>
-    ),
-    { duration: 8000 }
-  )
-}
-
 async function drainQueue(
   queueRef: MutableRefObject<Message[]>,
   drainingRef: MutableRefObject<boolean>,
@@ -83,11 +64,7 @@ async function drainQueue(
     const msg = queueRef.current.shift()!
     const onInteract = getInteract()
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-      if (document.visibilityState === "hidden") {
-        showDesktopNotification(msg, onInteract)
-      } else {
-        showInAppToast(msg, onInteract)
-      }
+      showDesktopNotification(msg, onInteract)
     }
     await new Promise((r) => setTimeout(r, QUEUE_GAP_MS))
   }
@@ -95,8 +72,9 @@ async function drainQueue(
 }
 
 /**
- * Notificações silenciosas para mensagens de outros utilizadores.
+ * Notificações nativas do sistema (Chrome / SO) via Notification API, silenciosas.
  * O primeiro lote após lista vazia (histórico / sala) não dispara.
+ * Se `new Notification` falhar, usa toast na página como fallback.
  */
 export function useMessageNotifications(
   enabled: boolean,
